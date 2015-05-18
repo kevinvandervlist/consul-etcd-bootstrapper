@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"github.com/kevinvandervlist/consul-etcd-bootstrapper/consul"
 	"github.com/kevinvandervlist/consul-etcd-bootstrapper/etcd"
-	"github.com/kevinvandervlist/consul-etcd-bootstrapper/util"
 	"log"
-	"net"
 	"os"
 	"time"
 )
@@ -25,17 +23,15 @@ func start() int {
 	clusterComplete := make(chan bool)
 	announceChannel := make(chan bool)
 
-	ip, err := util.GetIP()
-	util.AssertNoError(err)
-	log.Printf("IP: %v\n", ip)
-
 	token := flag.String("token", token_default, "The ETCD token to use.")
+	ip := flag.String("ip", "$public_ipv4", "The public ipv4 address of this node.")
 	consulBin := flag.String("consulBin", "/bin/consul", "Location of the consul binary")
 	consulArgs := flag.String("consulArgs", "\"-data-dir /data -ui-dir /ui -client 0.0.0.0\"", "Provide other arguments then shown defaults")
 
 	flag.Parse()
 
 	log.Printf("token: %s\n", *token)
+	log.Printf("ip: %s\n", *ip)
 	log.Printf("consulBin: %s\n", *consulBin)
 	log.Printf("consulArgs: %s\n", *consulArgs)
 	log.Printf("Note: Arguments agent -server -bind -join are provided by consul-etcd-bootstrapper.")
@@ -45,6 +41,13 @@ func start() int {
 		log.Printf("where n is your desired cluster size.")
 		return 1
 	}
+
+	if "$public_ipv4" == *ip {
+		log.Printf("An ip address to bind on is necessary. Please provide the concrete $public_ipv4 or $private_ipv4 value")
+		log.Printf("of this container instance.")
+		return 1
+	}
+
 
 	etcd := etcd.CreateEtcdClient(*token)
 
@@ -56,7 +59,7 @@ func start() int {
 	log.Printf("Expecting cluster size %v\n", clusterCount)
 
 	// Schedule a periodic announcer
-	go announcer(announceChannel, 300, 300, ip, etcd)
+	go announcer(announceChannel, 300, 300, *ip, etcd)
 	// Schedule a poller for the cluster members
 	go pollCluster(nodeChannel, clusterComplete, 30, clusterCount, etcd)
 
@@ -75,12 +78,12 @@ func start() int {
 	return wrapper.Run(*consulBin, *ip, clusterCount, nodes)
 }
 
-func announcer(complete chan bool, interval time.Duration, ttl uint64, ip *net.IPAddr, etcd *etcd.EtcdClient) {
+func announcer(complete chan bool, interval time.Duration, ttl uint64, ip string, etcd *etcd.EtcdClient) {
 	log.Printf("Announcing this node every %d seconds", interval)
-	log.Printf("Announcing this node as %v\n", ip.String())
+	log.Printf("Announcing this node as %v\n", ip)
 
 	announce := func() {
-		_, err := etcd.AnnounceNode(ip.String(), ttl)
+		_, err := etcd.AnnounceNode(ip, ttl)
 		if err != nil {
 			m := fmt.Sprintf("An error occurred while announcing this node: %v\n", err)
 			log.Printf(m)
