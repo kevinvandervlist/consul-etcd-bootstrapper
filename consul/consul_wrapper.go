@@ -28,7 +28,7 @@ func (c *ConsulWrapper) Run(bin string, ip net.IPAddr, expectedNodeCnt int, node
 		return 3
 	}
 
-	cli := strings.Join([]string{"agent -server ", unquotedArgs," -bootstrap-expect ", strconv.Itoa(expectedNodeCnt), " join ", strings.Join(nodes, " ")}, "")
+	cli := strings.Join([]string{"agent -server ", unquotedArgs," -bootstrap-expect ", strconv.Itoa(expectedNodeCnt), " -bind ", ip.String(), " join ", strings.Join(nodes, " ")}, "")
 	log.Printf("Executing child process:\n\t%s %s", bin, cli)
 	cmd := exec.Command(bin, strings.Split(cli, " ")...)
 	cmd.Stdout = os.Stdout
