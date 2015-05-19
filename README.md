@@ -1,5 +1,6 @@
 # consul-etcd-bootstrapper
 An application and accompanying container to simplify and fully automate the setup of a containerized consul cluster. It leverages etcd's service discovery in order to locate other cluster members. 
+This works almost the same as the bootstrap scenario with [Atlas](https://atlas.hashicorp.com/) integration, as [described on the bootstrapping page](https://www.consul.io/docs/guides/bootstrapping.html) of consul.
 
 # Warning
 It is a proof of concept.
