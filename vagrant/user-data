@@ -1,0 +1,54 @@
+#cloud-config
+
+---
+users:
+- name: kevin
+  coreos-ssh-import-github: kevinvandervlist
+  groups:
+  - sudo
+  - docker
+coreos:
+  etcd2:
+    discovery: <token>
+    advertise-client-urls: http://$public_ipv4:2379
+    initial-advertise-peer-urls: http://$public_ipv4:2380
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$public_ipv4:2380,http://$private_ipv4:7001
+  flannel:
+    interface: $public_ipv4
+  update:
+    reboot-strategy: etcd-lock
+  units:
+  - name: etcd2.service
+    command: start
+  - name: fleet.service
+    command: start
+  - name: configure-timezone.service
+    command: start
+    content: |
+      [Unit]
+      Description=Configure the timezone of these machines
+
+      [Service]
+      ExecStart=/usr/bin/timedatectl set-timezone Europe/Amsterdam
+      RemainAfterExit=yes
+      Type=oneshot
+  - name: consul-server.service
+    command: start
+    content: |
+      [Unit]
+      Description=Consul Server Agent
+      After=docker.service
+      After=etcd.service
+      [Service]
+      Restart=always
+      RestartSec=60
+      TimeoutStartSec=3m
+      ExecStartPre=-/usr/bin/docker kill consul-master
+      ExecStartPre=-/usr/bin/docker rm consul-master
+      ExecStartPre=/usr/bin/docker pull sogyo/consul-etcd-bootstrapper
+      ExecStart=/bin/sh -c "/usr/bin/docker run --name consul-master-$public_ipv4 --net=host -p 8300:8300 -p 8301:8301 -p 8301:8301/udp -p 8302:8302 -p 8302:8302/udp -p 8400:8400 -p 8500:8500 -p 8600:8600/udp sogyo/consul-etcd-bootstrapper -token <token> -ip $public_ipv4"
+      ExecStop=/usr/bin/docker stop consul-master
+      SyslogIdentifier=consul-master
+      [X-Fleet]
+      MachineMetadata=consul_role=server

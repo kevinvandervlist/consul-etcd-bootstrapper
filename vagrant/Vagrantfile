@@ -1,0 +1,112 @@
+require 'fileutils'
+require 'open-uri'
+require 'yaml'
+
+USER_DATA = File.join(File.dirname(__FILE__), "user-data")
+
+$new_discovery_url='https://discovery.etcd.io/new?size=3'
+
+#$coreos_release = "stable"
+$coreos_release = "alpha"
+$instance_cpu_cnt = 1
+$instance_memory = 512
+$instance_cnt = 3
+$instance_name_prefix = "consul"
+$ip_range = "10.199.0."
+# Port forwarding. guest => host + i
+$forwarded_ports = {8500 => 8500}
+
+
+def set_discovery_token_etcd()
+  token_url = open($new_discovery_url).read
+
+  data = YAML.load(IO.readlines(USER_DATA)[1..-1].join)
+  data['coreos']['etcd2']['discovery'] = token_url
+
+  yaml = YAML.dump(data)
+  File.open(USER_DATA, 'w') { |file| file.write("#cloud-config\n\n#{yaml}") }
+end
+
+def set_discovery_token_consul(service)
+  token_url = open($new_discovery_url).read
+  token = token_url.split(?/).last
+
+  data = YAML.load(IO.readlines(USER_DATA)[1..-1].join)
+  units = data['coreos']['units']
+  units.each do |u|
+    if u['name'] == service
+      buffer = Array.new
+      lines = u['content'].split(?\n).each do |line|
+        if line.start_with?('ExecStart=/bin/sh')
+          b = Array.new
+          line.split(?\s).each do |t|
+            if is_etcd_token(t)
+              b << token
+            else
+              b << t
+            end
+          end
+          buffer << b.join(?\s)
+        else
+          buffer << line
+        end
+      end
+      u['content'] = buffer.join(?\n).concat(?\n)
+    end
+  end
+
+  yaml = YAML.dump(data)
+  File.open(USER_DATA, 'w') { |file| file.write("#cloud-config\n\n#{yaml}") }
+end
+
+def is_etcd_token(token)
+  return token.length == 32 || token == '<token>'
+end
+
+def build_consul_machine(config, name, cnt, user_data)
+  config.vm.define vm_name = name do |config|
+
+    config.vm.hostname = name
+    
+    config.vm.provider "virtualbox" do |vb|
+      # Display the VirtualBox GUI when booting the machine
+      vb.gui = false
+  
+      # Customize the amount of memory on the VM:
+      vb.memory = $instance_memory
+      vb.cpus = $instance_cpu_cnt
+      vb.check_guest_additions = false
+      vb.functional_vboxsf = false
+    end
+
+    ip = "#{$ip_range}#{10+cnt}"
+    config.vm.network :private_network, ip: ip
+
+    $forwarded_ports.each do |guest, _host|
+      host = _host + cnt
+      config.vm.network "forwarded_port", guest: guest, host: host, auto_correct: true
+    end
+
+    if File.exist?(user_data)
+      config.vm.provision :file, :source => "#{user_data}", :destination => "/tmp/vagrantfile-user-data"
+      config.vm.provision :shell, :inline => "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", :privileged => true
+    end
+  end
+end
+
+# Set
+Vagrant.configure(2) do |config|
+  if File.exists?(USER_DATA) && ARGV[0].eql?('up')
+    set_discovery_token_etcd()
+    set_discovery_token_consul('consul-server.service')
+  end
+  config.vm.box = "coreos-%s" % $coreos_release
+  config.vm.box_check_update = true
+  #config.vm.box_version = ">= 647.0.0"
+  config.vm.box_url = "http://%s.release.core-os.net/amd64-usr/current/coreos_production_vagrant.json" % $coreos_release
+
+  # Create three machines that will act as the actual cluster
+  build_consul_machine(config, "%s-master-01" % $instance_name_prefix, 1, "#{USER_DATA}")
+  build_consul_machine(config, "%s-master-02" % $instance_name_prefix, 2, "#{USER_DATA}")
+  build_consul_machine(config, "%s-master-03" % $instance_name_prefix, 3, "#{USER_DATA}")
+end
