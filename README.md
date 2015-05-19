@@ -5,7 +5,7 @@ An application and accompanying container to simplify and fully automate the set
 It is a proof of concept.
 
 # Container
-A Docker container image can be found in the public registry as [sogyo/consul-etcd-bootstrapper](https://registry.hub.docker.com/u/consul-etcd-bootstrapper/).
+A Docker container image can be found in the public registry as [sogyo/consul-etcd-bootstrapper](https://registry.hub.docker.com/u/sogyo/consul-etcd-bootstrapper/).
 ```
 docker pull sogyo/consul-etcd-bootstrapper
 ```
