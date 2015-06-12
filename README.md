@@ -5,7 +5,7 @@ This works almost the same as the bootstrap scenario with [Atlas](https://atlas.
 # Warning
 It is a proof of concept.
 
-# Container
+# Container in the Docker Registry
 A Docker container image can be found in the public registry as [sogyo/consul-etcd-bootstrapper](https://registry.hub.docker.com/u/sogyo/consul-etcd-bootstrapper/).
 ```
 docker pull sogyo/consul-etcd-bootstrapper
