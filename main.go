@@ -26,7 +26,7 @@ func start() int {
 	token := flag.String("token", token_default, "The ETCD token to use.")
 	ip := flag.String("ip", "$public_ipv4", "The public ipv4 address of this node.")
 	consulBin := flag.String("consulBin", "/bin/consul", "Location of the consul binary")
-	consulArgs := flag.String("consulArgs", "\"-data-dir /data -ui-dir /ui -client 0.0.0.0\"", "Provide other arguments then shown defaults")
+	consulArgs := flag.String("consulArgs", "\"-data-dir /data -ui-dir /ui -config-dir /config -client 0.0.0.0\"", "Provide other arguments then shown defaults")
 
 	flag.Parse()
 
